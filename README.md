@@ -9,7 +9,11 @@ state and returns the answers with calibrated probabilities, end to end in 70–
 That is useless for an essay and close to ideal for the thing a human does without
 thinking: *which one do I shoot, and is it something I should be shooting at all.*
 
-![JEV-FPS in IFF triage mode](docs/screenshot.png)
+![JEV-FPS in IFF triage mode, running against jev-latest](docs/screenshot.png)
+
+*Live against `jev-latest`. The sight is on the supply lifter whose cargo crate has
+opened into a missile pod (78%); the relief lifter and the aid drone beside it are at
+0.0%, and the log shows a contact refused at 0.35.*
 
 ## Quick start
 
@@ -68,7 +72,8 @@ contact's geometry as JSON, plus what the gunner can make out through the sight.
 **Latency is the game mechanic.** A decision describes a board that is already ~200 ms
 old. The gun keeps executing the last command while the next is in flight, and the HUD
 counts answers that *outlived their contact* — calls whose contact was gone by the
-time they landed. In the fast drills that is routinely 20–45% of calls, which is the honest cost of putting a
+time they landed. Against the live model that is ~24% of calls in gridshot and ~1% in
+triage (where the gun is waiting on identification anyway), which is the honest cost of putting a
 model in a reflex loop, and why the model is asked *which* and not *where*.
 
 **Thresholds live in code, not in the model.** Jev reports `engage` as a probability;
@@ -103,6 +108,52 @@ failure each.
 (A–H) are recycled as contacts come and go; a refusal must not outlive the contact it
 was about.
 
+## Measured against the real model
+
+30-second rounds, `jev-latest`, decisions routed through the local server
+(`node scripts/bench.mjs --mode <drill> --seconds 30 --server http://127.0.0.1:8787`):
+
+| drill | kills | acc | friendly fire | correctly let through | escaped | calls | latency p50 / p95 | input tokens | cost |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| gridshot | 79 | 100% | – | – | 7 | 72 | 163 / 440 ms | 146,881 | $0.0062 |
+| drift | 56 | 100% | – | – | 4 | 73 | 152 / 255 ms | 141,663 | $0.0060 |
+| triage | 13 | 100% | **0** | 18 | 2 | 90 | 159 / 286 ms | 206,456 | $0.0087 |
+
+Latency sits inside TypeSafe's published 70–500 ms band with a local server hop on top,
+and a full 60-second round costs under two cents.
+
+### Does the rubric actually separate the contacts?
+
+`npm run iff-probe` asks one `engage` noul per contact in the set — all of them in a
+single call — and scores the answers against the ground truth the scoreboard uses:
+
+```
+jev-latest: 17/18 decided correctly, 1 held as uncertain, 0 wrong. 391 ms, 3925 input tokens.
+```
+
+The one it will not call is *a white drone squawking a friendly beacon stolen off a
+squadron we buried last week* (0.43) — undecidable from the sight picture alone, and it
+lands in the uncertain band, where the trigger stays shut. It gets the other five
+adversarial contacts right: the turreted medevac hull and the missile-pod supply lifter
+read as combatants (0.86), the disarmed gunship carrying casualties and the armoured
+ambulance read as protected (0.05, 0.04).
+
+That probe is the test to run after touching `ENGAGE_CRITERIA` — the rubric that reads
+well and classifies badly is the failure this catches. It caught one here: an earlier
+wording ("a non-combatant, a medical or supply craft, a friendly") made Jev protect
+*any* medical hull, turret included. What the contact carries and does decides it;
+markings do not.
+
+### Context moves the number
+
+The same contact does not score the same in isolation and in play. The turreted medevac
+hull reads 0.86 when asked on its own, and ~0.35 inside a full snapshot whose `rules`
+state that destroying a protected craft costs far more than letting a hostile escape.
+Jev is being appropriately cautious given the stakes the state describes — and the
+uncertain band absorbs it: the gun holds, parks the contact, and looks again. It is a
+reason to tune thresholds against snapshots from the real game rather than against
+questions asked in a vacuum.
+
 ## The drills
 
 | drill | what it tests |
@@ -133,6 +184,8 @@ $0.042/Mtok, and the raw request and response JSON of the last call.
 node scripts/bench.mjs --mode triage --seconds 30          # bundled simulator
 node scripts/bench.mjs --mode triage --server http://127.0.0.1:8787   # the server's brain
 node scripts/bench.mjs --mode gridshot --seconds 20 --trace
+
+TYPESAFE_API_KEY=... npm run iff-probe                     # score the rubric on the contact set
 
 npm start &
 node scripts/smoke.mjs --mode gridshot --seconds 20        # needs playwright

@@ -14,7 +14,8 @@
     "start": "node --env-file-if-exists=.env dist/server/index.js",
     "dev": "npm run build && npm start",
     "typecheck": "tsc -p tsconfig.server.json --noEmit && tsc -p tsconfig.web.json --noEmit",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "iff-probe": "node scripts/iff-probe.mjs"
   },
   "dependencies": {
     "@typesafe-ai/sdk": "^0.6.0"

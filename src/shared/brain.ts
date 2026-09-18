@@ -35,8 +35,20 @@ export const TEMPO_PROFILE: { slew: number; tolerance: number }[] = [
   { slew: 2.1, tolerance: 0.96 },
 ];
 
-const ROLE =
+export const ROLE =
   'You are the targeting brain of a fixed-position defence gun. The gun cannot move or take cover; it can only rotate its sight and fire.';
+
+/**
+ * What separates a combatant from a protected craft. Exported so the rubric can
+ * be evaluated on its own against the contact set -- see scripts/iff-probe.mjs.
+ */
+export const ENGAGE_CRITERIA = {
+  true: 'It carries a working weapon or is attacking. A medical or civilian hull with a gun on it still counts; markings do not make it safe.',
+  false:
+    'It is unarmed and not attacking -- medical, civilian, relief or friendly, or a hull whose weapons have been removed. A warlike hull does not make it a target.',
+} as const;
+
+export const ENGAGE_QUESTION = 'The contact under the crosshair right now should be destroyed.';
 
 function offsetPhrase(t: TargetView): string {
   const lr = t.yaw_deg >= 0 ? 'right' : 'left';
@@ -92,14 +104,17 @@ export function buildRequest(snapshot: Snapshot, model: string): SystemOneReques
     timing: `The sight slews at about ${Math.round(snapshot.crosshair.slew_deg_s)} degrees per second, so a contact 20deg away takes roughly ${Math.round((20 / Math.max(1, snapshot.crosshair.slew_deg_s)) * 1000)} ms to reach.`,
   };
   if (withIff) {
-    choiceInstructions['rules_of_engagement'] =
-      'Destroying a non-combatant is far worse than letting a hostile escape. When a contact reads as medical, civilian, unarmed or friendly, do not pick it.';
+    choiceInstructions['rules_of_engagement'] = [
+      'What a contact carries and what it is doing decides whether it is a combatant. Markings, hull type and paint do not.',
+      'A medical or civilian craft with a working weapon on it is a combatant. A warship with its weapons cut away, carrying wounded, is not.',
+      'Destroying a non-combatant is far worse than letting a hostile escape.',
+    ];
   }
 
   const locked = snapshot.locked_target;
   const engageInstructions: Record<string, JsonValue> = {
     role: ROLE,
-    question: 'The contact under the crosshair right now should be destroyed.',
+    question: ENGAGE_QUESTION,
     contact: locked
       ? {
           id: locked.id,
@@ -120,14 +135,12 @@ export function buildRequest(snapshot: Snapshot, model: string): SystemOneReques
     engage: {
       type: 'noul',
       instructions: engageInstructions,
-      criteria: {
-        true: withIff
-          ? 'A hostile: armed, aggressive, or closing. Shooting it is the right call.'
-          : 'A live contact worth the round.',
-        false: withIff
-          ? 'A non-combatant, a medical or supply craft, a friendly, or anything that must not be shot.'
-          : 'The sight is not on anything worth shooting.',
-      },
+      criteria: withIff
+        ? { ...ENGAGE_CRITERIA }
+        : {
+            true: 'A live contact worth the round.',
+            false: 'The sight is not on anything worth shooting.',
+          },
     },
     tempo: {
       type: 'score',
