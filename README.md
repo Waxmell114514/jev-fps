@@ -67,8 +67,8 @@ contact's geometry as JSON, plus what the gunner can make out through the sight.
 
 **Latency is the game mechanic.** A decision describes a board that is already ~200 ms
 old. The gun keeps executing the last command while the next is in flight, and the HUD
-counts *answers too late* — calls whose contact died during the round trip. In
-gridshot that is routinely 20–30% of calls, which is the honest cost of putting a
+counts answers that *outlived their contact* — calls whose contact was gone by the
+time they landed. In the fast drills that is routinely 20–45% of calls, which is the honest cost of putting a
 model in a reflex loop, and why the model is asked *which* and not *where*.
 
 **Thresholds live in code, not in the model.** Jev reports `engage` as a probability;
@@ -90,7 +90,11 @@ the friendly-fire count climb.
 **Confidence gates the target choice.** When `confidence` on the Choice answer falls
 below `minConfidence`, code ignores the answer and picks a target with a boring
 distance heuristic instead ([confidence-gated
-routing](https://docs.typesafe.ai/patterns/confidence-routing)). The fallback can aim
+routing](https://docs.typesafe.ai/patterns/confidence-routing)). The gate sits low
+(0.12) on purpose: a flat distribution over six interchangeable hostiles is
+indifference, not doubt, and the cost of a wrong pick there is a few hundred
+milliseconds. In IFF triage the same flatness matters more, which is what the slider
+is for. The fallback can aim
 at a protected craft — it knows nothing about IFF — but it cannot shoot one, because
 the trigger still needs a `fire` clearance from Jev. Two independent gates, one
 failure each.

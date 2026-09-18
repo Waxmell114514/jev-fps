@@ -62,14 +62,18 @@ export interface Policy {
   fireThreshold: number;
   /** noul <= this -> positively identified as not-a-target */
   holdThreshold: number;
-  /** choice confidence below this -> ignore Jev, use the code fallback */
+  /**
+   * Choice confidence below this -> ignore Jev, use the code fallback. Kept
+   * low on purpose: a flat distribution over six interchangeable hostiles is
+   * indifference, not doubt, and any of them is a fine answer.
+   */
   minConfidence: number;
 }
 
 export const DEFAULT_POLICY: Policy = {
   fireThreshold: 0.75,
   holdThreshold: 0.4,
-  minConfidence: 0.2,
+  minConfidence: 0.12,
 };
 
 export type FireVerdict = 'fire' | 'hold' | 'unsure';
