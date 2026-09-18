@@ -1,0 +1,26 @@
+{
+  "name": "jev-fps",
+  "version": "1.0.0",
+  "private": true,
+  "description": "An aim-trainer FPS whose player is Jev, TypeSafe AI's System One model.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "npm run build:server && npm run build:web",
+    "build:server": "tsc -p tsconfig.server.json",
+    "build:web": "tsc -p tsconfig.web.json",
+    "start": "node --env-file-if-exists=.env dist/server/index.js",
+    "dev": "npm run build && npm start",
+    "typecheck": "tsc -p tsconfig.server.json --noEmit && tsc -p tsconfig.web.json --noEmit",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "@typesafe-ai/sdk": "^0.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.3",
+    "typescript": "^6.0.2"
+  }
+}

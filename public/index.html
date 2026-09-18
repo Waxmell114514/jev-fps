@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JEV-FPS</title>
+    <meta name="description" content="An aim trainer whose gunner is Jev, TypeSafe AI's System One model." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='none' stroke='%23b98cff' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='3' fill='%23ff5f45'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <span class="logo"></span>
+          <div>
+            <h1>JEV&#8209;FPS</h1>
+            <p>an aim trainer played by a System&nbsp;One model</p>
+          </div>
+        </div>
+
+        <div class="controls">
+          <div class="group" role="radiogroup" aria-label="Pilot">
+            <span class="glabel">pilot</span>
+            <button class="seg active" data-pilot="jev">JEV</button>
+            <button class="seg" data-pilot="human">HUMAN</button>
+          </div>
+          <div class="group" role="radiogroup" aria-label="Mode">
+            <span class="glabel">drill</span>
+            <button class="seg active" data-mode="gridshot">GRIDSHOT</button>
+            <button class="seg" data-mode="triage">IFF TRIAGE</button>
+            <button class="seg" data-mode="drift">DRIFT</button>
+          </div>
+          <button id="start" class="primary">START ROUND</button>
+        </div>
+
+        <div class="brain">
+          <span id="brain-badge" class="badge sim">SIMULATOR</span>
+          <span id="brain-model" class="mono">jev-simulator</span>
+        </div>
+      </header>
+
+      <main>
+        <section class="stage">
+          <canvas id="view"></canvas>
+
+          <div class="stage-hud">
+            <div class="stat-block">
+              <div class="stat"><span id="s-points">0</span><label>points</label></div>
+              <div class="stat"><span id="s-kills">0</span><label>kills</label></div>
+              <div class="stat"><span id="s-acc">0%</span><label>accuracy</label></div>
+              <div class="stat"><span id="s-ttk">0 ms</span><label>avg ttk</label></div>
+              <div class="stat warn"><span id="s-ff">0</span><label>friendly fire</label></div>
+            </div>
+            <div class="clock"><span id="s-clock">60.0</span><label>seconds</label></div>
+          </div>
+
+          <div id="mode-blurb" class="mode-blurb"></div>
+
+          <div id="banner" class="banner">
+            <h2>Stand by</h2>
+            <p>Pick a pilot and a drill, then start the round.</p>
+          </div>
+        </section>
+
+        <aside class="panel">
+          <div class="card">
+            <h3>System One link</h3>
+            <div class="row"><label>endpoint</label><span id="p-endpoint" class="mono">local simulator</span></div>
+            <div class="row"><label>model</label><span id="p-model" class="mono">jev-simulator</span></div>
+            <div class="row"><label>decisions</label><span id="p-calls" class="mono">0</span></div>
+            <div class="row"><label>latency</label><span id="p-latency" class="mono">&ndash;</span></div>
+            <div class="row"><label>answers too late</label><span id="p-stale" class="mono">0</span></div>
+            <div class="row"><label>p50 / p95</label><span id="p-latency-p" class="mono">&ndash;</span></div>
+            <canvas id="spark" class="spark" width="640" height="110"></canvas>
+            <div class="row"><label>input tokens</label><span id="p-tokens" class="mono">0</span></div>
+            <div class="row"><label>cost so far</label><span id="p-cost" class="mono">$0.000000</span></div>
+          </div>
+
+          <div class="card">
+            <h3>target <em>choice</em></h3>
+            <div id="p-choice" class="bars"></div>
+            <div class="row"><label>confidence</label><span id="p-conf" class="mono">&ndash;</span></div>
+            <div class="row"><label>fallbacks</label><span id="p-fallback" class="mono">0</span></div>
+          </div>
+
+          <div class="card">
+            <h3>engage <em>noul</em></h3>
+            <div class="gauge"><div id="p-engage-fill" class="fill"></div><div class="gate lo"></div><div class="gate hi"></div></div>
+            <div class="row"><label id="p-engage-label">contact</label><span id="p-engage" class="mono">&ndash;</span></div>
+            <div class="row"><label>verdict</label><span id="p-verdict" class="chip">&ndash;</span></div>
+            <div class="row"><label>shots withheld</label><span id="p-withheld" class="mono">0</span></div>
+          </div>
+
+          <div class="card">
+            <h3>tempo <em>score</em></h3>
+            <div class="gauge"><div id="p-tempo-fill" class="fill tempo"></div></div>
+            <div class="row"><label>level</label><span id="p-tempo" class="mono">&ndash;</span></div>
+            <div class="row"><label>slew rate</label><span id="p-slew" class="mono">&ndash;</span></div>
+          </div>
+
+          <div class="card">
+            <h3>decision log</h3>
+            <div id="p-log" class="log"></div>
+          </div>
+
+          <div class="card">
+            <h3>policy <em>applied in code</em></h3>
+            <label class="slider">fire when noul &ge; <b id="v-fire">0.75</b>
+              <input id="i-fire" type="range" min="0.3" max="0.99" step="0.01" value="0.75" />
+            </label>
+            <label class="slider">hold when noul &le; <b id="v-hold">0.40</b>
+              <input id="i-hold" type="range" min="0.05" max="0.6" step="0.01" value="0.4" />
+            </label>
+            <label class="slider">code fallback under confidence <b id="v-conf">0.20</b>
+              <input id="i-conf" type="range" min="0" max="0.9" step="0.01" value="0.2" />
+            </label>
+            <label class="slider">min gap between calls <b id="v-gap">90 ms</b>
+              <input id="i-gap" type="range" min="0" max="600" step="10" value="90" />
+            </label>
+            <label class="check"><input id="i-overlay" type="checkbox" checked /> show the model's distribution on the range</label>
+          </div>
+
+          <div class="card">
+            <h3>last call</h3>
+            <div class="tabs">
+              <button class="tab active" data-tab="request">request</button>
+              <button class="tab" data-tab="response">response</button>
+            </div>
+            <pre id="p-json" class="json">no call yet</pre>
+          </div>
+        </aside>
+      </main>
+    </div>
+
+    <script type="module" src="./js/web/main.js"></script>
+  </body>
+</html>
